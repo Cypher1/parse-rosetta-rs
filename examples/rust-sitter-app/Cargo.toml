@@ -6,6 +6,12 @@ edition.workspace = true
 name = "rust-sitter-app"
 path = "app.rs"
 
+[features]
+default = ["tree-sitter-standard"]
+tree-sitter-c2rust = ["rust-sitter/tree-sitter-c2rust"]
+tree-sitter-standard = ["rust-sitter/tree-sitter-standard"]
+
+
 [dependencies]
 rust-sitter = { version = "0.4.3", default-features = false }
 codemap = "0.1.3"

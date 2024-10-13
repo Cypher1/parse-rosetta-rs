@@ -124,6 +124,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
+name = "c2rust-bitfields"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb34f0c0ace43530b2df7f18bc69ee0c4082158aa451ece29602f8c841e73764"
+dependencies = [
+ "c2rust-bitfields-derive",
+]
+
+[[package]]
+name = "c2rust-bitfields-derive"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3dd1601a7b828ab874d890e5a895563ca8ad485bdd3d2a359f148c8b72537241"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "cactus"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -554,7 +574,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex-syntax",
- "syn",
+ "syn 2.0.48",
 ]
 
 [[package]]
@@ -918,6 +938,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "890cd29b9cd344678003f03f22d8b171a4d4b333f1ba88e2804b1ef7dd39b1d5"
 dependencies = [
  "rust-sitter-macro",
+ "tree-sitter",
+ "tree-sitter-c2rust",
 ]
 
 [[package]]
@@ -937,7 +959,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d8e1c8d26b8d5fb23415a5123588669e776ad934abbfbe6d8677ed322694216"
 dependencies = [
  "quote",
- "syn",
+ "syn 2.0.48",
 ]
 
 [[package]]
@@ -949,7 +971,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rust-sitter-common",
- "syn",
+ "syn 2.0.48",
 ]
 
 [[package]]
@@ -962,7 +984,7 @@ dependencies = [
  "rust-sitter-common",
  "serde",
  "serde_json",
- "syn",
+ "syn 2.0.48",
  "syn-inline-mod",
  "tempfile",
  "tree-sitter",
@@ -1050,7 +1072,7 @@ checksum = "243902eda00fad750862fc144cea25caca5e20d615af0a81bee94ca738f1df1f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.48",
 ]
 
 [[package]]
@@ -1159,6 +1181,17 @@ dependencies = [
 
 [[package]]
 name = "syn"
+version = "1.0.109"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
+name = "syn"
 version = "2.0.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f3531638e407dfc0814761abb7c00a5b54992b849452a0646b7f65c9f770f3f"
@@ -1175,7 +1208,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fa6dca1fdb7b2ed46dd534a326725419d4fb10f23d8c85a8b2860e5eb25d0f9"
 dependencies = [
  "proc-macro2",
- "syn",
+ "syn 2.0.48",
 ]
 
 [[package]]
@@ -1227,7 +1260,7 @@ checksum = "fa0faa943b50f3db30a20aa7e265dbc66076993efed8463e8de414e5d06d3471"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.48",
 ]
 
 [[package]]
@@ -1285,6 +1318,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9871f16d6cf5c4757dcf30d5d2172a2df6987c510c017bbb7abfb7f9aa24d06"
 dependencies = [
  "cc",
+ "regex",
+ "regex-syntax",
+ "streaming-iterator",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "tree-sitter-c2rust"
+version = "0.24.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5f97c8ed19295f92e02af90c915c72d0836e08132f155709bc45b66acdfde35"
+dependencies = [
+ "c2rust-bitfields",
+ "once_cell",
  "regex",
  "regex-syntax",
  "streaming-iterator",
@@ -1649,5 +1696,5 @@ checksum = "e1012d89e3acb79fad7a799ce96866cfb8098b74638465ea1b1533d35900ca90"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.48",
 ]

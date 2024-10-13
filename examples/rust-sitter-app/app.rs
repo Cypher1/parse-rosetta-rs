@@ -1,3 +1,9 @@
+use std::{env, fs};
+
+use codemap::CodeMap;
+use codemap_diagnostic::{ColorConfig, Diagnostic, Emitter, Level, SpanLabel, SpanStyle};
+use rust_sitter::errors::{ParseError, ParseErrorReason};
+
 mod parser;
 
 fn convert_parse_error_to_diagnostics(
@@ -51,7 +57,7 @@ fn convert_parse_error_to_diagnostics(
 
 fn main() {
     let file = env::args().nth(1).expect("Expected file argument");
-    let src = fs::read_to_string(file)
+    let src = fs::read_to_string(&file)
         .expect("Failed to read file");
 
     match parser::grammar::parse(src.as_str()) {
@@ -67,7 +73,7 @@ fn main() {
         }
         Err(errs) => {
             let mut codemap = CodeMap::new();
-            let file_span = codemap.add_file(file, input.to_string());
+            let file_span = codemap.add_file(file, src.to_string());
             let mut diagnostics = vec![];
             for error in errs {
                 convert_parse_error_to_diagnostics(&file_span.span, &error, &mut diagnostics);
