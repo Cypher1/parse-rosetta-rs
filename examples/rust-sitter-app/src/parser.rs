@@ -8,7 +8,7 @@ pub mod grammar {
         #[rust_sitter::leaf(text = "null")]
         Null,
         Str(
-            #[rust_sitter::leaf(pattern = "\"[^\"]*\"", transform = |v| v.to_string())]
+            #[rust_sitter::leaf(pattern = "\"([^\"]|\\\")*\"", transform = |v| v[1..v.len()-1].to_string())]
             String
         ),
         Boolean(
@@ -46,7 +46,7 @@ pub mod grammar {
 
     #[derive(PartialEq, Eq, Debug)]
     pub struct Property {
-        #[rust_sitter::leaf(pattern = "\"[^\"]\"", transform = |v| v.to_string())]
+        #[rust_sitter::leaf(pattern = "\"([^\"]|\\\")*\"", transform = |v| v[1..v.len()-1].to_string())]
         name: String,
         #[rust_sitter::leaf(text = r":")]
         sep: (),
@@ -64,7 +64,7 @@ pub mod grammar {
 
     #[derive(Debug)]
     pub struct JsonNumber {
-        #[rust_sitter::leaf(pattern = r"\d+", transform = |v| v.parse().unwrap())]
+        #[rust_sitter::leaf(pattern = r"\d+\.?\d*[eE]?\d*", transform = |v| v.parse().unwrap())]
         value: f64,
     }
     impl JsonNumber {
@@ -137,13 +137,13 @@ mod test {
 
         let input = r#"{"a":42,"b":"x"}"#;
 
-        let expected = Object(
+        let expected: JsonValue = Object(
+            (),
             vec![
                 Property::new("a".to_string(), Number(JsonNumber::new(42.0))),
                 Property::new("b".to_string(), Str("x".to_string())),
-            ]
-            .into_iter()
-            .collect(),
+            ],
+            (),
         );
 
         assert_eq!(grammar::parse(input)?, expected);
@@ -156,7 +156,7 @@ mod test {
 
         let input = r#"[42,"x"]"#;
 
-        let expected = Array(vec![Number(JsonNumber::new(42.0)), Str("x".to_string())]);
+        let expected = Array((), vec![Number(JsonNumber::new(42.0)), Str("x".to_string())], ());
 
         assert_eq!(grammar::parse(input)?, expected);
         Ok(())
@@ -183,6 +183,7 @@ mod test {
         assert_eq!(
             grammar::parse(input)?,
             Object(
+                (),
                 vec![
                     ("null".to_string(), Null),
                     ("true".to_string(), Boolean(true)),
@@ -191,26 +192,28 @@ mod test {
                     ("string".to_string(), Str(" abc 123 ".to_string())),
                     (
                         "array".to_string(),
-                        Array(vec![Boolean(false), Number(JsonNumber::new(1.0)), Str("two".to_string())])
+                        Array((), vec![Boolean(false), Number(JsonNumber::new(1.0)), Str("two".to_string())], ())
                     ),
                     (
                         "object".to_string(),
-                        Object(
+                        Object((),
                             vec![
                                 ("a".to_string(), Number(JsonNumber::new(1.0))),
                                 ("b".to_string(), Str("c".to_string())),
                             ]
                             .into_iter()
                             .map(|(x, y)| Property::new(x, y))
-                            .collect()
+                            .collect(),
+                            ()
                         )
                     ),
-                    ("empty_array".to_string(), Array(vec![]),),
-                    ("empty_object".to_string(), Object(Vec::new()),),
+                    ("empty_array".to_string(), Array((), vec![], ()),),
+                    ("empty_object".to_string(), Object((), Vec::new(), ()),),
                 ]
                 .into_iter()
                 .map(|(x, y)| Property::new(x, y))
-                .collect()
+                .collect(),
+                ()
             )
         );
         Ok(())
