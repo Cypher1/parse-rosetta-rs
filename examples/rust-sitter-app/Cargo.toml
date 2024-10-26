@@ -4,7 +4,7 @@ edition.workspace = true
 
 [[bin]]
 name = "rust-sitter-app"
-path = "app.rs"
+path = "src/app.rs"
 
 [features]
 default = ["tree-sitter-standard"]

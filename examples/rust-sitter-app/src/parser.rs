@@ -3,9 +3,12 @@ pub mod grammar {
     #[rust_sitter::language]
     #[derive(PartialEq, Eq, Debug)]
     pub enum JsonValue {
+        #[rust_sitter::leaf(text = "undefined")]
+        Undefined,
+        #[rust_sitter::leaf(text = "null")]
         Null,
         Str(
-            #[rust_sitter::leaf(pattern = "\"[^\"]\"", transform = |v| v.to_string())]
+            #[rust_sitter::leaf(pattern = "\"[^\"]*\"", transform = |v| v.to_string())]
             String
         ),
         Boolean(
@@ -13,20 +16,39 @@ pub mod grammar {
             bool
         ),
         Number(JsonNumber),
-        Array(Vec<JsonValue>),
-        Object(
+        #[rust_sitter::delimited(
+            #[rust_sitter::leaf(text = ",")]
+            ()
+        )]
+        Array(
+            #[rust_sitter::leaf(text = r"[")]
+            (),
             #[rust_sitter::delimited(
                 #[rust_sitter::leaf(text = ",")]
+                ()
             )]
-            Vec<Property>
+            Vec<JsonValue>,
+            #[rust_sitter::leaf(text = r"]")]
+            (),
+        ),
+        Object(
+            #[rust_sitter::leaf(text = r"{")]
+            (),
+            #[rust_sitter::delimited(
+                #[rust_sitter::leaf(text = ",")]
+                ()
+            )]
+            Vec<Property>,
+            #[rust_sitter::leaf(text = r"}")]
+            (),
         ),
     }
 
     #[derive(PartialEq, Eq, Debug)]
     pub struct Property {
-        #[rust_sitter::leaf(pattern = r"\d+", transform = |v| v.parse().unwrap())]
+        #[rust_sitter::leaf(pattern = "\"[^\"]\"", transform = |v| v.to_string())]
         name: String,
-        #[rust_sitter::leaf(pattern = r":")]
+        #[rust_sitter::leaf(text = r":")]
         sep: (),
         value: JsonValue,
     }
