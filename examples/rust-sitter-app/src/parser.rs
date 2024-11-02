@@ -1,5 +1,31 @@
 #[rust_sitter::grammar("parser")]
 pub mod grammar {
+
+    fn unescape(s: &str) -> String {
+        let mut t = String::new();
+        let mut escape = false;
+        for i in s.chars() {
+            let ch = match i {
+                '\\' if !escape => {
+                    escape = true;
+                    continue;
+                }
+                i if !escape => i,
+                'n' => '\n',
+                'r' => '\r',
+                't' => '\t',
+                '\'' => '\'',
+                '"' => '\"',
+                '\\' => '\\',
+                'u' => '\u{0}', //TODO
+                '/' => '\\',
+                _ => i, // TODO
+            };
+            t.push(ch);
+        }
+        t
+    }
+
     #[rust_sitter::language]
     #[derive(PartialEq, Eq, Debug)]
     pub enum JsonValue {
@@ -8,7 +34,7 @@ pub mod grammar {
         #[rust_sitter::leaf(text = "null")]
         Null,
         Str(
-            #[rust_sitter::leaf(pattern = "\"([^\"]|\\\")*\"", transform = |v| v[1..v.len()-1].to_string())]
+            #[rust_sitter::leaf(pattern = r#""([^\"]|\\")*""#, transform = |v| unescape(&v[1..v.len()-1]))]
              String,
         ),
         Boolean(#[rust_sitter::leaf(pattern = "(true|false)", transform = |v| v == "true")] bool),
@@ -39,7 +65,7 @@ pub mod grammar {
 
     #[derive(PartialEq, Eq, Debug)]
     pub struct Property {
-        #[rust_sitter::leaf(pattern = "\"([^\"]|\\\")*\"", transform = |v| v[1..v.len()-1].to_string())]
+        #[rust_sitter::leaf(pattern = r#""([^\"]|\\")*""#, transform = |v| unescape(&v[1..v.len()-1]))]
         name: String,
         #[rust_sitter::leaf(text = r":")]
         sep: (),
@@ -118,7 +144,7 @@ mod test {
     fn json_object() -> Result<(), Error> {
         use JsonValue::{Number, Object, Str};
 
-        let input = r#"{"a":42,"b":"x"}"#;
+        let input = "{\"a\":42,\"b\":\"x\"}";
 
         let expected: JsonValue = Object(
             (),
