@@ -9,38 +9,31 @@ pub mod grammar {
         Null,
         Str(
             #[rust_sitter::leaf(pattern = "\"([^\"]|\\\")*\"", transform = |v| v[1..v.len()-1].to_string())]
-            String
+             String,
         ),
-        Boolean(
-            #[rust_sitter::leaf(pattern = "(true|false)", transform = |v| v == "true")]
-            bool
-        ),
+        Boolean(#[rust_sitter::leaf(pattern = "(true|false)", transform = |v| v == "true")] bool),
         Number(JsonNumber),
         #[rust_sitter::delimited(
             #[rust_sitter::leaf(text = ",")]
             ()
         )]
         Array(
-            #[rust_sitter::leaf(text = r"[")]
-            (),
+            #[rust_sitter::leaf(text = r"[")] (),
             #[rust_sitter::delimited(
                 #[rust_sitter::leaf(text = ",")]
                 ()
             )]
             Vec<JsonValue>,
-            #[rust_sitter::leaf(text = r"]")]
-            (),
+            #[rust_sitter::leaf(text = r"]")] (),
         ),
         Object(
-            #[rust_sitter::leaf(text = r"{")]
-            (),
+            #[rust_sitter::leaf(text = r"{")] (),
             #[rust_sitter::delimited(
                 #[rust_sitter::leaf(text = ",")]
                 ()
             )]
             Vec<Property>,
-            #[rust_sitter::leaf(text = r"}")]
-            (),
+            #[rust_sitter::leaf(text = r"}")] (),
         ),
     }
 
@@ -89,11 +82,11 @@ pub mod grammar {
 
 #[cfg(test)]
 mod test {
+    use super::grammar::{JsonNumber, JsonValue, Property};
     #[allow(clippy::useless_attribute)]
     #[allow(dead_code)] // its dead for benches
     use super::*;
     use rust_sitter::errors::ParseError;
-    use super::grammar::{JsonValue, JsonNumber, Property};
     use JsonValue::*;
 
     #[allow(clippy::useless_attribute)]
@@ -102,30 +95,20 @@ mod test {
 
     #[test]
     fn json_string() -> Result<(), Error> {
-        assert_eq!(
-            grammar::parse("\"\"")?,
-            Str("".to_string())
-        );
-        assert_eq!(
-            grammar::parse("\"abc\"")?,
-            Str("abc".to_string())
-        );
+        assert_eq!(grammar::parse("\"\"")?, Str("".to_string()));
+        assert_eq!(grammar::parse("\"abc\"")?, Str("abc".to_string()));
         assert_eq!(
             grammar::parse("\"abc\\\"\\\\\\/\\b\\f\\n\\r\\t\\u0001\\u2014\u{2014}def\"")?,
             Str("abc\"\\/\x08\x0C\n\r\t\x01——def".to_string()),
         );
-        assert_eq!(
-            grammar::parse("\"\\uD83D\\uDE10\"")?,
-            Str("😐".to_string())
-        );
+        assert_eq!(grammar::parse("\"\\uD83D\\uDE10\"")?, Str("😐".to_string()));
 
         assert!(grammar::parse("\"").is_err());
         assert!(grammar::parse("\"abc").is_err());
         assert!(grammar::parse("\"\\\"").is_err());
         assert!(grammar::parse("\"\\u123\"").is_err());
         assert!(grammar::parse("\"\\uD800\"").is_err());
-        assert!(grammar::parse("\"\\uD800\\uD800\"")
-            .is_err());
+        assert!(grammar::parse("\"\\uD800\\uD800\"").is_err());
         assert!(grammar::parse("\"\\uDC00\"").is_err());
 
         Ok(())
@@ -156,7 +139,11 @@ mod test {
 
         let input = r#"[42,"x"]"#;
 
-        let expected = Array((), vec![Number(JsonNumber::new(42.0)), Str("x".to_string())], ());
+        let expected = Array(
+            (),
+            vec![Number(JsonNumber::new(42.0)), Str("x".to_string())],
+            (),
+        );
 
         assert_eq!(grammar::parse(input)?, expected);
         Ok(())
@@ -192,11 +179,20 @@ mod test {
                     ("string".to_string(), Str(" abc 123 ".to_string())),
                     (
                         "array".to_string(),
-                        Array((), vec![Boolean(false), Number(JsonNumber::new(1.0)), Str("two".to_string())], ())
+                        Array(
+                            (),
+                            vec![
+                                Boolean(false),
+                                Number(JsonNumber::new(1.0)),
+                                Str("two".to_string())
+                            ],
+                            ()
+                        )
                     ),
                     (
                         "object".to_string(),
-                        Object((),
+                        Object(
+                            (),
                             vec![
                                 ("a".to_string(), Number(JsonNumber::new(1.0))),
                                 ("b".to_string(), Str("c".to_string())),

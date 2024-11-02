@@ -57,8 +57,7 @@ fn convert_parse_error_to_diagnostics(
 
 fn main() {
     let file = env::args().nth(1).expect("Expected file argument");
-    let src = fs::read_to_string(&file)
-        .expect("Failed to read file");
+    let src = fs::read_to_string(&file).expect("Failed to read file");
 
     match parser::grammar::parse(src.as_str()) {
         Ok(json) => {
