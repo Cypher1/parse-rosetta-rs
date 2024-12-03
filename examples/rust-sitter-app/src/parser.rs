@@ -1,48 +1,80 @@
-#[rust_sitter::grammar("parser")]
-pub mod grammar {
+use core::str;
 
-    fn unescape(s: &str) -> String {
-        let mut t = String::new();
-        let mut escape = false;
-        for i in s.chars() {
+#[derive(Debug)]
+enum EscapeError {
+    UnfinishedEscapeSequence,
+    UnicodeError, // (Vec<u16>),
+}
+
+fn unescape(s: &str) -> Result<String, EscapeError> {
+    let mut t: Vec<u16> = vec![];
+    let mut unicode = false;
+    let mut escape = 0; // The number of characters to escape.
+    for i in s.chars() {
+        if escape > 0 {
             let ch = match i {
-                '\\' if !escape => {
-                    escape = true;
-                    continue;
-                }
-                i if !escape => i,
                 'n' => '\n',
+                'b' => 8 as char,
+                'f' => 12 as char,
                 'r' => '\r',
                 't' => '\t',
                 '\'' => '\'',
-                '"' => '\"',
+                '"' => '"',
                 '\\' => '\\',
-                'u' => '\u{0}', //TODO
-                '/' => '\\',
-                _ => i, // TODO
-            };
+                '/' => '/',
+                'u' => {
+                    escape = 4;
+                    unicode = true;
+                    continue;
+                }
+                _ => {
+                    if !unicode {
+                        panic!("CH >> {i:?}");
+                    }
+                    i
+                }
+            } as u16;
+            escape -= 1;
             t.push(ch);
+            if escape == 0 && unicode {
+                // Convert the last 4 characters.
+                let trailing = String::from_utf16(&t[t.len() - 4..]).expect("????");
+                let unicode = u16::from_str_radix(&trailing, 16).expect("?????");
+                for _ in 0..4 {
+                    t.pop();
+                }
+                t.push(unicode);
+            }
+        } else if i == '\\' {
+            escape = 1;
+            unicode = false;
+        } else {
+            t.push(i as u16);
         }
-        t
     }
+    if escape > 0 {
+        return Err(EscapeError::UnfinishedEscapeSequence);
+    }
+    match String::from_utf16(&t) {
+        Ok(s) => Ok(s),
+        Err(_) => Err(EscapeError::UnicodeError), // (t)),
+    }
+}
+
+#[rust_sitter::grammar("parser")]
+pub mod grammar {
 
     #[rust_sitter::language]
     #[derive(PartialEq, Eq, Debug)]
     pub enum JsonValue {
-        #[rust_sitter::leaf(text = "undefined")]
-        Undefined,
         #[rust_sitter::leaf(text = "null")]
         Null,
-        Str(
-            #[rust_sitter::leaf(pattern = r#""([^\"]|\\")*""#, transform = |v| unescape(&v[1..v.len()-1]))]
-             String,
-        ),
-        Boolean(#[rust_sitter::leaf(pattern = "(true|false)", transform = |v| v == "true")] bool),
+        #[rust_sitter::leaf(pattern = "true")]
+        True,
+        #[rust_sitter::leaf(pattern = "false")]
+        False,
         Number(JsonNumber),
-        #[rust_sitter::delimited(
-            #[rust_sitter::leaf(text = ",")]
-            ()
-        )]
+        Str(JsonString),
         Array(
             #[rust_sitter::leaf(text = r"[")] (),
             #[rust_sitter::delimited(
@@ -64,18 +96,23 @@ pub mod grammar {
     }
 
     #[derive(PartialEq, Eq, Debug)]
+    pub struct JsonString(
+        #[rust_sitter::leaf(pattern = r#""([^\"]|\\")*""#, transform = |v| crate::parser::unescape(&v[1..v.len()-1]).expect("?"))]
+        pub String,
+    );
+
+    #[derive(PartialEq, Eq, Debug)]
     pub struct Property {
-        #[rust_sitter::leaf(pattern = r#""([^\"]|\\")*""#, transform = |v| unescape(&v[1..v.len()-1]))]
-        name: String,
+        name: JsonString,
         #[rust_sitter::leaf(text = r":")]
         sep: (),
         value: JsonValue,
     }
     impl Property {
         #[cfg(test)]
-        pub fn new(name: String, value: JsonValue) -> Self {
+        pub fn new<S: Into<String>>(name: S, value: JsonValue) -> Self {
             Self {
-                name,
+                name: JsonString(name.into()),
                 sep: (),
                 value,
             }
@@ -110,12 +147,30 @@ pub mod grammar {
 
 #[cfg(test)]
 mod test {
-    use super::grammar::{JsonNumber, JsonValue, Property};
+    use super::grammar::{
+        JsonNumber, JsonString, JsonValue, JsonValue::False, JsonValue::Null, JsonValue::True,
+        Property,
+    };
     #[allow(clippy::useless_attribute)]
     #[allow(dead_code)] // its dead for benches
     use super::*;
     use rust_sitter::errors::ParseError;
-    use JsonValue::*;
+
+    fn jstr<S: Into<String>>(s: S) -> JsonValue {
+        JsonValue::Str(JsonString(s.into()))
+    }
+
+    fn jobject(v: Vec<Property>) -> JsonValue {
+        JsonValue::Object((), v, ())
+    }
+
+    fn jarray(v: Vec<JsonValue>) -> JsonValue {
+        JsonValue::Array((), v, ())
+    }
+
+    fn jnum(f: f64) -> JsonValue {
+        JsonValue::Number(JsonNumber::new(f))
+    }
 
     #[allow(clippy::useless_attribute)]
     #[allow(dead_code)] // its dead for benches
@@ -123,13 +178,13 @@ mod test {
 
     #[test]
     fn json_string() -> Result<(), Error> {
-        assert_eq!(grammar::parse("\"\"")?, Str("".to_string()));
-        assert_eq!(grammar::parse("\"abc\"")?, Str("abc".to_string()));
+        assert_eq!(grammar::parse("\"\"")?, jstr(""));
+        assert_eq!(grammar::parse("\"abc\"")?, jstr("abc"));
         assert_eq!(
             grammar::parse("\"abc\\\"\\\\\\/\\b\\f\\n\\r\\t\\u0001\\u2014\u{2014}def\"")?,
-            Str("abc\"\\/\x08\x0C\n\r\t\x01——def".to_string()),
+            jstr("abc\"\\/\x08\x0C\n\r\t\x01——def"),
         );
-        assert_eq!(grammar::parse("\"\\uD83D\\uDE10\"")?, Str("😐".to_string()));
+        assert_eq!(grammar::parse("\"\\uD83D\\uDE10\"")?, jstr("😐"));
 
         assert!(grammar::parse("\"").is_err());
         assert!(grammar::parse("\"abc").is_err());
@@ -144,18 +199,12 @@ mod test {
 
     #[test]
     fn json_object() -> Result<(), Error> {
-        use JsonValue::{Number, Object, Str};
-
         let input = "{\"a\":42,\"b\":\"x\"}";
 
-        let expected: JsonValue = Object(
-            (),
-            vec![
-                Property::new("a".to_string(), Number(JsonNumber::new(42.0))),
-                Property::new("b".to_string(), Str("x".to_string())),
-            ],
-            (),
-        );
+        let expected: JsonValue = jobject(vec![
+            Property::new("a", jnum(42.0)),
+            Property::new("b", jstr("x")),
+        ]);
 
         assert_eq!(grammar::parse(input)?, expected);
         Ok(())
@@ -163,15 +212,9 @@ mod test {
 
     #[test]
     fn json_array() -> Result<(), Error> {
-        use JsonValue::{Array, Number, Str};
-
         let input = r#"[42,"x"]"#;
 
-        let expected = Array(
-            (),
-            vec![Number(JsonNumber::new(42.0)), Str("x".to_string())],
-            (),
-        );
+        let expected = jarray(vec![jnum(42.0), jstr("x")]);
 
         assert_eq!(grammar::parse(input)?, expected);
         Ok(())
@@ -179,8 +222,6 @@ mod test {
 
     #[test]
     fn json_whitespace() -> Result<(), Error> {
-        use JsonValue::{Array, Boolean, Null, Number, Object, Str};
-
         let input = r#"
   {
     "null" : null,
@@ -197,48 +238,23 @@ mod test {
 
         assert_eq!(
             grammar::parse(input)?,
-            Object(
-                (),
-                vec![
-                    ("null".to_string(), Null),
-                    ("true".to_string(), Boolean(true)),
-                    ("false".to_string(), Boolean(false)),
-                    ("number".to_string(), Number(JsonNumber::new(123e4))),
-                    ("string".to_string(), Str(" abc 123 ".to_string())),
-                    (
-                        "array".to_string(),
-                        Array(
-                            (),
-                            vec![
-                                Boolean(false),
-                                Number(JsonNumber::new(1.0)),
-                                Str("two".to_string())
-                            ],
-                            ()
-                        )
-                    ),
-                    (
-                        "object".to_string(),
-                        Object(
-                            (),
-                            vec![
-                                ("a".to_string(), Number(JsonNumber::new(1.0))),
-                                ("b".to_string(), Str("c".to_string())),
-                            ]
-                            .into_iter()
-                            .map(|(x, y)| Property::new(x, y))
-                            .collect(),
-                            ()
-                        )
-                    ),
-                    ("empty_array".to_string(), Array((), vec![], ()),),
-                    ("empty_object".to_string(), Object((), Vec::new(), ()),),
-                ]
-                .into_iter()
-                .map(|(x, y)| Property::new(x, y))
-                .collect(),
-                ()
-            )
+            jobject(vec![
+                Property::new("null", Null),
+                Property::new("true", True),
+                Property::new("false", False),
+                Property::new("number", jnum(123e4)),
+                Property::new("string", jstr(" abc 123 ")),
+                Property::new("array", jarray(vec![False, jnum(1.0), jstr("two")])),
+                Property::new(
+                    "object",
+                    jobject(vec![
+                        Property::new("a", jnum(1.0)),
+                        Property::new("b", jstr("c")),
+                    ])
+                ),
+                Property::new("empty_array", jarray(vec![]),),
+                Property::new("empty_object", jobject(vec![]),),
+            ])
         );
         Ok(())
     }
