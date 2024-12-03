@@ -7,6 +7,7 @@ type Error = (String, Span);
 type Result<T> = std::result::Result<T, Error>;
 
 /// Represent any valid JSON value.
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum Value {
     /// null.

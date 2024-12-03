@@ -5,6 +5,7 @@
 use chumsky::prelude::*;
 use std::collections::HashMap;
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum Json {
     Invalid,
