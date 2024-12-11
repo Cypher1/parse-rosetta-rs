@@ -9,45 +9,45 @@ enum EscapeError {
 fn unescape(s: &str) -> Result<String, EscapeError> {
     let mut t: Vec<u16> = vec![];
     let mut unicode = false;
+    let mut encoded: u16 = 0;
     let mut escape = 0; // The number of characters to escape.
     for i in s.chars() {
         if escape > 0 {
             let ch = match i {
-                'n' => '\n',
-                'b' => 8 as char,
-                'f' => 12 as char,
-                'r' => '\r',
-                't' => '\t',
-                '\'' => '\'',
-                '"' => '"',
-                '\\' => '\\',
-                '/' => '/',
+                'n' => '\n' as u16,
+                'b' => 8,
+                'f' => 12,
+                'r' => '\r' as u16,
+                't' => '\t' as u16,
+                '\'' => '\'' as u16,
+                '"' => '"' as u16,
+                '\\' => '\\' as u16,
+                '/' => '/' as u16,
                 'u' => {
                     escape = 4;
                     unicode = true;
+                    encoded = 0;
                     continue;
                 }
-                _ => {
-                    if !unicode {
-                        panic!("CH >> {i:?}");
-                    }
-                    i
-                }
-            } as u16;
+                '0'..'9' if unicode => (i as u16)-('0' as u16),
+                'A'..'F' if unicode => 10+(i as u16)-('A' as u16),
+                _ => panic!("CH >> {i:?}"),
+            };
             escape -= 1;
-            t.push(ch);
-            if escape == 0 && unicode {
-                // Convert the last 4 characters.
-                let trailing = String::from_utf16(&t[t.len() - 4..]).expect("????");
-                let unicode = u16::from_str_radix(&trailing, 16).expect("?????");
-                for _ in 0..4 {
-                    t.pop();
-                }
-                t.push(unicode);
+            if !unicode {
+                t.push(ch);
+                continue;
+            }
+            // Handle the byte as hex encoded unicode.
+            // TODO: This isn't correct in cases
+            encoded *= 16;
+            encoded += ch;
+            if escape == 0 {
+                t.push(encoded);
+                unicode = false;
             }
         } else if i == '\\' {
             escape = 1;
-            unicode = false;
         } else {
             t.push(i as u16);
         }
