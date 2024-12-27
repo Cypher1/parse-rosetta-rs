@@ -2,7 +2,7 @@ use core::str;
 
 #[derive(Debug)]
 enum EscapeError {
-    UnfinishedEscapeSequence,
+    UnfinishedEscapeSequence(String),
     UnicodeError, // (Vec<u16>),
 }
 
@@ -14,27 +14,28 @@ fn unescape(s: &str) -> Result<String, EscapeError> {
     for i in s.chars() {
         if escape > 0 {
             let ch = match i {
-                'n' => '\n' as u16,
                 'b' => 8,
-                'f' => 12,
-                'r' => '\r' as u16,
-                't' => '\t' as u16,
-                '\'' => '\'' as u16,
-                '"' => '"' as u16,
-                '\\' => '\\' as u16,
-                '/' => '/' as u16,
                 'u' => {
                     escape = 4;
                     unicode = true;
                     encoded = 0;
                     continue;
                 }
+                'r' => '\r' as u16,
+                'n' => '\n' as u16,
+                't' => '\t' as u16,
+                'f' => 12,
+                '\'' => '\'' as u16,
+                '"' => '"' as u16,
+                '\\' => '\\' as u16,
+                '/' => '/' as u16,
                 '0'..'9' if unicode => (i as u16)-('0' as u16),
                 'A'..'F' if unicode => 10+(i as u16)-('A' as u16),
                 _ => panic!("CH >> {i:?}"),
             };
             escape -= 1;
             if !unicode {
+                println!(">>> {ch}");
                 t.push(ch);
                 continue;
             }
@@ -42,6 +43,7 @@ fn unescape(s: &str) -> Result<String, EscapeError> {
             // TODO: This isn't correct in cases
             encoded *= 16;
             encoded += ch;
+            println!(">> {ch} ({encoded})");
             if escape == 0 {
                 t.push(encoded);
                 unicode = false;
@@ -53,7 +55,8 @@ fn unescape(s: &str) -> Result<String, EscapeError> {
         }
     }
     if escape > 0 {
-        return Err(EscapeError::UnfinishedEscapeSequence);
+        println!(">> {s} which is {s:?}");
+        return Err(EscapeError::UnfinishedEscapeSequence(s.to_string()));
     }
     match String::from_utf16(&t) {
         Ok(s) => Ok(s),
@@ -76,35 +79,35 @@ pub mod grammar {
         Number(JsonNumber),
         Str(JsonString),
         Array(
-            #[rust_sitter::leaf(text = r"[")] (),
+            #[rust_sitter::leaf(text = "[")] (),
             #[rust_sitter::delimited(
                 #[rust_sitter::leaf(text = ",")]
                 ()
             )]
             Vec<JsonValue>,
-            #[rust_sitter::leaf(text = r"]")] (),
+            #[rust_sitter::leaf(text = "]")] (),
         ),
         Object(
-            #[rust_sitter::leaf(text = r"{")] (),
+            #[rust_sitter::leaf(text = "{")] (),
             #[rust_sitter::delimited(
                 #[rust_sitter::leaf(text = ",")]
                 ()
             )]
             Vec<Property>,
-            #[rust_sitter::leaf(text = r"}")] (),
+            #[rust_sitter::leaf(text = "}")] (),
         ),
     }
 
     #[derive(PartialEq, Eq, Debug)]
     pub struct JsonString(
-        #[rust_sitter::leaf(pattern = r#""([^\"]|\\")*""#, transform = |v| crate::parser::unescape(&v[1..v.len()-1]).expect("?"))]
+        #[rust_sitter::leaf(pattern = "\"([^\\\"]|\\[burntf'\"\\/])*\"", transform = |v| crate::parser::unescape(&v[1..v.len()-1]).expect("?"))]
         pub String,
     );
 
     #[derive(PartialEq, Eq, Debug)]
     pub struct Property {
         name: JsonString,
-        #[rust_sitter::leaf(text = r":")]
+        #[rust_sitter::leaf(text = ":")]
         sep: (),
         value: JsonValue,
     }
@@ -121,7 +124,7 @@ pub mod grammar {
 
     #[derive(Debug)]
     pub struct JsonNumber {
-        #[rust_sitter::leaf(pattern = r"\d+\.?\d*[eE]?\d*", transform = |v| v.parse().unwrap())]
+        #[rust_sitter::leaf(pattern = "\\d+\\.?\\d*[eE]?\\d*", transform = |v| v.parse().unwrap())]
         value: f64,
     }
     impl JsonNumber {
@@ -140,7 +143,7 @@ pub mod grammar {
 
     #[rust_sitter::extra]
     struct Whitespace {
-        #[rust_sitter::leaf(pattern = r"\s")]
+        #[rust_sitter::leaf(pattern = "\\s")]
         _whitespace: (),
     }
 }
@@ -175,6 +178,26 @@ mod test {
     #[allow(clippy::useless_attribute)]
     #[allow(dead_code)] // its dead for benches
     type Error = Vec<ParseError>;
+
+    #[test]
+    fn unfinished_json_string_1() -> Result<(), Error> {
+        assert_eq!(r#""\""#, "\"\\\"");
+        assert!(grammar::parse(r#""\""#).is_err());
+        assert!(grammar::parse("\"\\\"").is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn unfinished_json_string_2() -> Result<(), Error> {
+        assert!(grammar::parse("\\\"").is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn unfinished_json_string_3() -> Result<(), Error> {
+        assert!(grammar::parse("\\").is_err());
+        Ok(())
+    }
 
     #[test]
     fn json_string() -> Result<(), Error> {
